@@ -7,25 +7,35 @@ import whisper
 
 app = Flask(__name__)
 
-# Configuración
-MODEL_SIZE = 'large'  # 'tiny', 'base', 'small', 'medium'
-
-# Cargar el modelo Whisper al iniciar
-print(f"Cargando modelo Whisper {MODEL_SIZE}...")
+modelo = None  # Variable global para el modelo Whisper
 device = "cuda" if torch.cuda.is_available() else "cpu"
-modelo = whisper.load_model(MODEL_SIZE, device=device)
-print(f"Modelo cargado correctamente en {device}")
+
+@app.route('/api/load_model', methods=['POST'])
+def cargar_modelo():
+    global modelo
+    try:
+        data = request.get_json()
+        model_size = data.get('model_size', 'base')  # por defecto 'base'
+        
+        if modelo is not None:
+            return jsonify({'message': 'El modelo ya está cargado. Reinicia si deseas cambiar el modelo.'}), 400
+
+        print(f"Cargando modelo Whisper '{model_size}' en {device}...")
+        modelo = whisper.load_model(model_size, device=device)
+        print("Modelo cargado correctamente.")
+        return jsonify({'message': f'Modelo "{model_size}" cargado exitosamente en {device}.'})
+    except Exception as e:
+        print(f"Error al cargar el modelo: {str(e)}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 def transcribir_audio(audio_bytes):
-    """
-    Transcribe un archivo de audio usando Whisper, a partir de los bytes.
-    """
+    global modelo
+    if modelo is None:
+        return None, "El modelo aún no ha sido cargado. Usa /api/load_model primero."
     try:
-        # Cargar el audio desde los bytes utilizando librosa
         print(f"Cargando audio desde los bytes...")
         audio, sr = librosa.load(io.BytesIO(audio_bytes), sr=16000)
-        
-        # Realizar la transcripción
         print("Procesando transcripción...")
         resultado = modelo.transcribe(audio)
         return resultado["text"], None
@@ -37,40 +47,28 @@ def transcribir_audio(audio_bytes):
 @app.route('/api/transcribe', methods=['POST'])
 def api_transcribe():
     try:
-        # Verificar si hay un archivo en la solicitud
         if 'audio_file' not in request.files:
             return jsonify({'error': 'No se encontró ningún archivo de audio'}), 400
-        
+
         audio_file = request.files['audio_file']
-        
-        # Verificar si se seleccionó un archivo
+
         if audio_file.filename == '':
             return jsonify({'error': 'No se seleccionó ningún archivo de audio'}), 400
-        
-        try:
-            # Leer los bytes del archivo
-            audio_bytes = audio_file.read()
-            
-            # Transcribir el audio
-            transcripcion, error = transcribir_audio(audio_bytes)
-            
-            if error:
-                return jsonify({'error': f'Error al transcribir: {error}'}), 500
-            
-            return jsonify({'transcription': transcripcion})
-        
-        except Exception as e:
-            print(f"Error en el procesamiento: {str(e)}")
-            traceback.print_exc()
-            return jsonify({'error': str(e)}), 500
-    
+
+        audio_bytes = audio_file.read()
+        transcripcion, error = transcribir_audio(audio_bytes)
+
+        if error:
+            return jsonify({'error': f'Error al transcribir: {error}'}), 500
+
+        return jsonify({'transcription': transcripcion})
     except Exception as e:
         print(f"Error general: {str(e)}")
         traceback.print_exc()
         return jsonify({'error': f'Error inesperado: {str(e)}'}), 500
 
 if __name__ == '__main__':
-    # Ejecutar el servidor Flask
     print("Iniciando servicio de transcripción en http://localhost:5003")
-    print("- API disponible en: http://localhost:5003/api/transcribe")
+    print("- Carga de modelo:      POST http://localhost:5003/api/load_model (JSON: {'model_size': 'large'})")
+    print("- Transcripción audio:  POST http://localhost:5003/api/transcribe")
     app.run(host='0.0.0.0', port=5003, debug=True)
