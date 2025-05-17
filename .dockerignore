@@ -1,0 +1,32 @@
+# Archivos de Python compilados y caché
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Entornos virtuales
+venv/
+.venv/
+.venWhisper/
+
+# Archivos comprimidos y pesados
+*.tar
+*.zip
+*.gz
+*.rar
+
+# Archivos temporales y ocultos del sistema
+.DS_Store
+Thumbs.db
+
+# Carpeta de modelos o datos grandes
+uploads/
+datasets/
+models/
+checkpoints/
+logs/
+notebooks/
+
+# Configuraciones locales
+.env
+*.swp
