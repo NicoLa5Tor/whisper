@@ -4,18 +4,19 @@ import io
 import librosa
 import traceback
 import whisper
+import os
 
 app = Flask(__name__)
 
 modelo = None  # Variable global para el modelo Whisper
 device = "cuda" if torch.cuda.is_available() else "cpu"
-
+model = os.environ.get("MODEL","base")
 @app.route('/api/load_model', methods=['POST'])
 def cargar_modelo():
     global modelo
     try:
         data = request.get_json()
-        model_size = data.get('model_size', 'base')  # por defecto 'base'
+        model_size = data.get('model_size', model)  # por defecto 'base'
         
         if modelo is not None:
             return jsonify({'message': 'El modelo ya está cargado. Reinicia si deseas cambiar el modelo.'}), 400
